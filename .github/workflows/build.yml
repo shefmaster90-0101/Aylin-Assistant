@@ -13,12 +13,12 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.5'
+      - name: Accept Android Licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
       - name: Build Debug APK
         run: gradle assembleDebug
       - name: Upload APK
@@ -26,3 +26,4 @@ jobs:
         with:
           name: Aylin-Assistant-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+
