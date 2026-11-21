@@ -39,99 +39,113 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        try {
+            setContentView(R.layout.activity_main)
+            tvStatus = findViewById(R.id.tvStatus)
+            tvLog = findViewById(R.id.tvLog)
+            btnMic = findViewById(R.id.btnMic)
+            btnSettings = findViewById(R.id.btnSettings)
 
-        tvStatus = findViewById(R.id.tvStatus)
-        tvLog = findViewById(R.id.tvLog)
-        btnMic = findViewById(R.id.btnMic)
-        btnSettings = findViewById(R.id.btnSettings)
+            checkPermissions()
+            tts = TextToSpeech(this, this)
+            setupSpeechRecognizer()
 
-        checkPermissions()
-        tts = TextToSpeech(this, this)
-        setupSpeechRecognizer()
-
-        btnMic.setOnClickListener { startListening() }
-        btnSettings.setOnClickListener { showSettingsDialog() }
-    }
-
-    private fun checkPermissions() {
-        val perms = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CALL_PHONE)
-        if (perms.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
-            ActivityCompat.requestPermissions(this, perms, 101)
+            btnMic.setOnClickListener { startListening() }
+            btnSettings.setOnClickListener { showSettingsDialog() }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Ошибка запуска: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
+    private fun checkPermissions() {
+        try {
+            val perms = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CALL_PHONE)
+            if (perms.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
+                ActivityCompat.requestPermissions(this, perms, 101)
+            }
+        } catch (_: Exception) {}
+    }
+
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale("ru", "RU")
-            tts?.setPitch(1.25f)
-            tts?.setSpeechRate(1.05f)
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {}
-                override fun onDone(utteranceId: String?) {
-                    runOnUiThread {
-                        if (utteranceId == "WAKE_GREETING") {
-                            startListening()
+        try {
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale("ru", "RU")
+                tts?.setPitch(1.25f)
+                tts?.setSpeechRate(1.05f)
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) {
+                        runOnUiThread {
+                            if (utteranceId == "WAKE_GREETING") {
+                                startListening()
+                            }
                         }
                     }
-                }
-                override fun onError(utteranceId: String?) {}
-            })
-            speak("Да, Сэр.", "WAKE_GREETING")
+                    override fun onError(utteranceId: String?) {}
+                })
+                speak("Да, Сэр.", "WAKE_GREETING")
+            } else {
+                tvStatus.text = "Голосовой движок не найден, нажмите кнопку"
+            }
+        } catch (e: Exception) {
+            tvLog.text = "TTS: ${e.message}"
         }
     }
 
     private fun speak(text: String, id: String = "MSG") {
         tvLog.text = "Айлин: $text\n\n${tvLog.text}"
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        try {
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        } catch (_: Exception) {}
     }
 
     private fun setupSpeechRecognizer() {
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {
-                tvStatus.text = "🎙 Слушаю Вас, Сэр..."
+        try {
+            if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+                tvStatus.text = "Распознавание речи недоступно на устройстве"
+                return
             }
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {
-                tvStatus.text = "⏳ Обрабатываю..."
-            }
-            override fun onError(error: Int) {
-                tvStatus.text = "Нажмите кнопку или скажите команду"
-            }
-            override fun onResults(results: Bundle?) {
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                val command = matches?.firstOrNull() ?: return
-                tvLog.text = "Сэр: $command\n${tvLog.text}"
-                processCommand(command)
-            }
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+            speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) { tvStatus.text = "🎙 Слушаю Вас, Сэр..." }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() { tvStatus.text = "⏳ Обрабатываю..." }
+                override fun onError(error: Int) { tvStatus.text = "Нажмите кнопку и скажите команду" }
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val command = matches?.firstOrNull() ?: return
+                    tvLog.text = "Сэр: $command\n${tvLog.text}"
+                    processCommand(command)
+                }
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        } catch (e: Exception) {
+            tvStatus.text = "Ошибка микрофона: ${e.message}"
+        }
     }
 
     private fun startListening() {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+            }
+            speechRecognizer?.startListening(intent)
+        } catch (e: Exception) {
+            tvStatus.text = "Не удалось включить микрофон"
         }
-        speechRecognizer?.startListening(intent)
     }
 
     private fun processCommand(cmd: String) {
         val lower = cmd.lowercase(Locale.getDefault())
-
         when {
-            lower == "айлин" -> {
-                speak("Да, Сэр?", "WAKE_GREETING")
-            }
+            lower == "айлин" -> speak("Да, Сэр?", "WAKE_GREETING")
             lower.contains("ютуб") || lower.contains("youtube") -> {
-                val query = lower.replace("айлин", "")
-                    .replace("открой", "").replace("включи", "")
-                    .replace("на ютубе", "").replace("ютуб", "")
-                    .replace("youtube", "").trim()
+                val query = lower.replace("айлин", "").replace("открой", "").replace("включи", "")
+                    .replace("на ютубе", "").replace("ютуб", "").replace("youtube", "").trim()
                 speak("Так точно, Сэр!")
                 if (query.isNotEmpty()) {
                     val intent = Intent(Intent.ACTION_SEARCH).apply {
@@ -164,29 +178,29 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     type = "image/*"
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
-                startActivity(intent)
+                try { startActivity(intent) } catch (_: Exception) {}
             }
             lower.contains("музык") -> {
                 speak("Так точно, Сэр!")
-                val intent = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC)
-                startActivity(intent)
+                try {
+                    startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC))
+                } catch (_: Exception) {}
             }
             lower.contains("метатрейдер") || lower.contains("mt5") || lower.contains("график") -> {
                 speak("Так точно, Сэр! Открываю MetaTrader 5.")
                 launchApp("net.metaquotes.metatrader5")
             }
-            else -> {
-                askGemini(cmd)
-            }
+            else -> askGemini(cmd)
         }
     }
 
     private fun launchApp(packageName: String) {
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-        if (intent != null) {
-            startActivity(intent)
-        } else {
-            speak("Приложение не установлено на устройстве, Сэр.")
+        try {
+            val intent = packageManager.getLaunchIntentForPackage(packageName)
+            if (intent != null) startActivity(intent)
+            else speak("Приложение не найдено, Сэр.")
+        } catch (_: Exception) {
+            speak("Не удалось открыть приложение, Сэр.")
         }
     }
 
@@ -196,7 +210,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val greenUrl = prefs.getString("GREEN_URL", "") ?: ""
 
         if (apiKey.isEmpty()) {
-            speak("Сэр, пожалуйста, укажите ваш Gemini API ключ в настройках внизу экрана.")
+            speak("Сэр, укажите ваш Gemini API ключ в настройках внизу экрана.")
             return
         }
 
@@ -214,23 +228,32 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     })
                 }
 
-                val req = Request.Builder()
-                    .url("https://googleapis.com")
-                    .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                    .build()
+                val jsonBody = JSONObject().apply {
+                    put("contents", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("parts", JSONArray().apply {
+                                put(JSONObject().apply { put("text", "$systemPrompt\n\nЗапрос Сэра: $userText") })
+                            })
+                        })
+                    })
+                }
 
-                val resp = client.newCall(req).execute()
-                val respStr = resp.body?.string() ?: ""
-                val reply = JSONObject(respStr)
-                    .getJSONArray("candidates").getJSONObject(0)
-                    .getJSONObject("content").getJSONArray("parts")
-                    .getJSONObject(0).getString("text").trim()
-
-                withContext(Dispatchers.Main) {
-                    tvStatus.text = "Готова к работе, Сэр"
-                    if (reply.contains("\"action\":\"whatsapp\"")) {
-                        val cleanJson = reply.substringAfter("{").substringBeforeLast("}")
-                        val obj = JSONObject("{$cleanJson}")
+Используйте код с осторожностью.
+val req = Request.Builder()
+.url("googleapis.com")
+.post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+.build()
+val resp = client.newCall(req).execute()
+val respStr = resp.body?.string() ?: ""
+val reply = JSONObject(respStr)
+.getJSONArray("candidates").getJSONObject(0)
+.getJSONObject("content").getJSONArray("parts")
+.getJSONObject(0).getString("text").trim()
+withContext(Dispatchers.Main) {
+tvStatus.text = "Готова к работе, Сэр"
+if (reply.contains(""action":"whatsapp"")) {
+val cleanJson = reply.substringAfter("{").substringBeforeLast("}")
+val obj = JSONObject("{$cleanJson}")
 sendWhatsApp(greenUrl, obj.getString("phone"), obj.getString("text"))
 } else {
 speak(reply)
@@ -294,9 +317,11 @@ Toast.makeText(this, "Сохранено, Сэр!", Toast.LENGTH_SHORT).show()
 .show()
 }
 override fun onDestroy() {
+try {
 tts?.stop()
 tts?.shutdown()
 speechRecognizer?.destroy()
+} catch (_: Exception) {}
 super.onDestroy()
 }
 }
