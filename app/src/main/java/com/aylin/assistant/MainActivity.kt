@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             btnMic.setOnClickListener { startListening() }
             btnSettings.setOnClickListener { showSettingsDialog() }
         } catch (e: Exception) {
-            Toast.makeText(this, "Ошибка запуска: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -76,33 +76,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) {
                         runOnUiThread {
-                            if (utteranceId == "WAKE_GREETING") {
-                                startListening()
-                            }
+                            if (utteranceId == "WAKE_GREETING") startListening()
                         }
                     }
                     override fun onError(utteranceId: String?) {}
                 })
                 speak("Да, Сэр.", "WAKE_GREETING")
             } else {
-                tvStatus.text = "Голосовой движок не найден, нажмите кнопку"
+                tvStatus.text = "Нажмите кнопку и скажите команду"
             }
-        } catch (e: Exception) {
-            tvLog.text = "TTS: ${e.message}"
-        }
+        } catch (_: Exception) {}
     }
 
     private fun speak(text: String, id: String = "MSG") {
         tvLog.text = "Айлин: $text\n\n${tvLog.text}"
-        try {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
-        } catch (_: Exception) {}
+        try { tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) } catch (_: Exception) {}
     }
 
     private fun setupSpeechRecognizer() {
         try {
             if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-                tvStatus.text = "Распознавание речи недоступно на устройстве"
+                tvStatus.text = "Микрофон не поддерживается"
                 return
             }
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
@@ -114,17 +108,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 override fun onEndOfSpeech() { tvStatus.text = "⏳ Обрабатываю..." }
                 override fun onError(error: Int) { tvStatus.text = "Нажмите кнопку и скажите команду" }
                 override fun onResults(results: Bundle?) {
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val command = matches?.firstOrNull() ?: return
+                    val command = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
                     tvLog.text = "Сэр: $command\n${tvLog.text}"
                     processCommand(command)
                 }
                 override fun onPartialResults(partialResults: Bundle?) {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })
-        } catch (e: Exception) {
-            tvStatus.text = "Ошибка микрофона: ${e.message}"
-        }
+        } catch (_: Exception) {}
     }
 
     private fun startListening() {
@@ -134,9 +125,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
             }
             speechRecognizer?.startListening(intent)
-        } catch (e: Exception) {
-            tvStatus.text = "Не удалось включить микрофон"
-        }
+        } catch (_: Exception) {}
     }
 
     private fun processCommand(cmd: String) {
@@ -153,38 +142,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         putExtra("query", query)
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     }
-                    try { startActivity(intent) } catch (e: Exception) {
+                    try { startActivity(intent) } catch (_: Exception) {
                         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://youtube.com")))
                     }
-                } else {
-                    launchApp("com.google.android.youtube")
-                }
+                } else launchApp("com.google.android.youtube")
             }
-            lower.contains("инстаграм") || lower.contains("instagram") -> {
-                speak("Так точно, Сэр!")
-                launchApp("com.instagram.android")
-            }
-            lower.contains("телеграм") || lower.contains("telegram") -> {
-                speak("Так точно, Сэр!")
-                launchApp("org.telegram.messenger")
-            }
-            lower.contains("хром") || lower.contains("браузер") -> {
-                speak("Так точно, Сэр!")
-                launchApp("com.android.chrome")
-            }
+            lower.contains("инстаграм") || lower.contains("instagram") -> { speak("Так точно, Сэр!"); launchApp("com.instagram.android") }
+            lower.contains("телеграм") || lower.contains("telegram") -> { speak("Так точно, Сэр!"); launchApp("org.telegram.messenger") }
+            lower.contains("хром") || lower.contains("браузер") -> { speak("Так точно, Сэр!"); launchApp("com.android.chrome") }
             lower.contains("галере") || lower.contains("фото") -> {
                 speak("Так точно, Сэр!")
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    type = "image/*"
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                try { startActivity(intent) } catch (_: Exception) {}
+                try { startActivity(Intent(Intent.ACTION_VIEW).apply { type = "image/*"; flags = Intent.FLAG_ACTIVITY_NEW_TASK }) } catch (_: Exception) {}
             }
             lower.contains("музык") -> {
                 speak("Так точно, Сэр!")
-                try {
-                    startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC))
-                } catch (_: Exception) {}
+                try { startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC)) } catch (_: Exception) {}
             }
             lower.contains("метатрейдер") || lower.contains("mt5") || lower.contains("график") -> {
                 speak("Так точно, Сэр! Открываю MetaTrader 5.")
@@ -197,131 +169,68 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun launchApp(packageName: String) {
         try {
             val intent = packageManager.getLaunchIntentForPackage(packageName)
-            if (intent != null) startActivity(intent)
-            else speak("Приложение не найдено, Сэр.")
-        } catch (_: Exception) {
-            speak("Не удалось открыть приложение, Сэр.")
-        }
+            if (intent != null) startActivity(intent) else speak("Приложение не найдено, Сэр.")
+        } catch (_: Exception) {}
     }
 
     private fun askGemini(userText: String) {
         val prefs = getSharedPreferences("AylinPrefs", Context.MODE_PRIVATE)
         val apiKey = prefs.getString("GEMINI_KEY", "") ?: ""
         val greenUrl = prefs.getString("GREEN_URL", "") ?: ""
-
-        if (apiKey.isEmpty()) {
-            speak("Сэр, укажите ваш Gemini API ключ в настройках внизу экрана.")
-            return
-        }
+        if (apiKey.isEmpty()) { speak("Сэр, укажите Gemini API ключ в настройках."); return }
 
         tvStatus.text = "🧠 Айлин думает..."
         scope.launch(Dispatchers.IO) {
             try {
-                val systemPrompt = "Ты Айлин, личный голосовой ассистент. Обращайся к пользователю исключительно 'Сэр'. Отвечай кратко, чётко, без лишних слов, как Джарвис. Если Сэр просит отправить сообщение в WhatsApp, верни ТОЛЬКО JSON: {\"action\":\"whatsapp\",\"phone\":\"77001234567\",\"text\":\"текст\"}. Если Сэр спрашивает про трейдинг, XAUUSD или стратегию (SMC, ICT, FVG), дай краткий точный анализ."
-                val jsonBody = JSONObject().apply {
-                    put("contents", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("parts", JSONArray().apply {
-                                put(JSONObject().apply { put("text", "$systemPrompt\n\nЗапрос Сэра: $userText") })
-                            })
-                        })
-                    })
-                }
+                val prompt = "Ты Айлин, личный голосовой ассистент. Обращайся к пользователю исключительно 'Сэр'. Отвечай кратко и чётко. Если Сэр просит отправить WhatsApp, верни ТОЛЬКО JSON: {\"action\":\"whatsapp\",\"phone\":\"77001234567\",\"text\":\"текст\"}. Если Сэр спрашивает про трейдинг, XAUUSD, SMC, ICT или FVG, дай краткий точный анализ."
+                val bodyJson = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", "$prompt\n\nЗапрос Сэра: $userText")))))
+                val req = Request.Builder()
+                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+                    .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+                val respStr = client.newCall(req).execute().body?.string() ?: ""
+                val reply = JSONObject(respStr).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text").trim()
 
-                val jsonBody = JSONObject().apply {
-                    put("contents", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("parts", JSONArray().apply {
-                                put(JSONObject().apply { put("text", "$systemPrompt\n\nЗапрос Сэра: $userText") })
-                            })
-                        })
-                    })
+                withContext(Dispatchers.Main) {
+                    tvStatus.text = "Готова к работе, Сэр"
+                    if (reply.contains("\"action\":\"whatsapp\"")) {
+                        val obj = JSONObject("{${reply.substringAfter("{").substringBeforeLast("}")}}")
+                        sendWhatsApp(greenUrl, obj.getString("phone"), obj.getString("text"))
+                    } else speak(reply)
                 }
-
-Используйте код с осторожностью.
-val req = Request.Builder()
-.url("googleapis.com")
-.post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-.build()
-val resp = client.newCall(req).execute()
-val respStr = resp.body?.string() ?: ""
-val reply = JSONObject(respStr)
-.getJSONArray("candidates").getJSONObject(0)
-.getJSONObject("content").getJSONArray("parts")
-.getJSONObject(0).getString("text").trim()
-withContext(Dispatchers.Main) {
-tvStatus.text = "Готова к работе, Сэр"
-if (reply.contains(""action":"whatsapp"")) {
-val cleanJson = reply.substringAfter("{").substringBeforeLast("}")
-val obj = JSONObject("{$cleanJson}")
-sendWhatsApp(greenUrl, obj.getString("phone"), obj.getString("text"))
-} else {
-speak(reply)
-}
-}
-} catch (e: Exception) {
-withContext(Dispatchers.Main) {
-tvStatus.text = "Ошибка связи"
-speak("Сэр, возникла ошибка соединения с сервером.")
-}
+            } catch (_: Exception) {
+        
+withContext(Dispatchers.Main) { tvStatus.text = "Ошибка связи"; speak("Сэр, ошибка соединения с сервером.") }
 }
 }
 }
 private fun sendWhatsApp(greenUrl: String, phone: String, message: String) {
-if (greenUrl.isEmpty()) {
-speak("Сэр, укажите ссылку Green-API в настройках для отправки WhatsApp.")
-return
-}
+if (greenUrl.isEmpty()) { speak("Сэр, укажите ссылку Green-API в настройках."); return }
 speak("Так точно, Сэр! Отправляю сообщение в WhatsApp.")
 scope.launch(Dispatchers.IO) {
 try {
-val body = JSONObject().apply {
-put("chatId", "${phone.replace("+", "")}@c.us")
-put("message", message)
-}
-val req = Request.Builder()
-.url(greenUrl)
-.post(body.toString().toRequestBody("application/json".toMediaType()))
-.build()
-client.newCall(req).execute()
+val body = JSONObject().put("chatId", "${phone.replace("+", "")}@c.us").put("message", message)
+client.newCall(Request.Builder().url(greenUrl).post(body.toString().toRequestBody("application/json".toMediaType())).build()).execute()
 } catch (_: Exception) {}
 }
 }
 private fun showSettingsDialog() {
 val prefs = getSharedPreferences("AylinPrefs", Context.MODE_PRIVATE)
-val layout = LinearLayout(this).apply {
-orientation = LinearLayout.VERTICAL
-setPadding(40, 30, 40, 10)
-}
-val etGemini = EditText(this).apply {
-hint = "Gemini API Key (AIzaSy...)"
-setText(prefs.getString("GEMINI_KEY", ""))
-}
-val etGreen = EditText(this).apply {
-hint = "Green-API sendMessage URL"
-setText(prefs.getString("GREEN_URL", ""))
-}
-layout.addView(etGemini)
-layout.addView(etGreen)
+val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40, 30, 40, 10) }
+val etGemini = EditText(this).apply { hint = "Gemini API Key (AIzaSy...)"; setText(prefs.getString("GEMINI_KEY", "")) }
+val etGreen = EditText(this).apply { hint = "Green-API sendMessage URL"; setText(prefs.getString("GREEN_URL", "")) }
+layout.addView(etGemini); layout.addView(etGreen)
 AlertDialog.Builder(this)
 .setTitle("Настройки Айлин")
 .setView(layout)
 .setPositiveButton("Сохранить") { _, _ ->
-prefs.edit()
-.putString("GEMINI_KEY", etGemini.text.toString().trim())
-.putString("GREEN_URL", etGreen.text.toString().trim())
-.apply()
+prefs.edit().putString("GEMINI_KEY", etGemini.text.toString().trim()).putString("GREEN_URL", etGreen.text.toString().trim()).apply()
 Toast.makeText(this, "Сохранено, Сэр!", Toast.LENGTH_SHORT).show()
 }
-.setNegativeButton("Отмена", null)
-.show()
+.setNegativeButton("Отмена", null).show()
 }
 override fun onDestroy() {
-try {
-tts?.stop()
-tts?.shutdown()
-speechRecognizer?.destroy()
-} catch (_: Exception) {}
+try { tts?.stop(); tts?.shutdown(); speechRecognizer?.destroy() } catch (_: Exception) {}
 super.onDestroy()
 }
 }
