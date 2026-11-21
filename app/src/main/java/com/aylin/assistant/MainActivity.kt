@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognitionListener
@@ -12,6 +13,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.view.Gravity
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -29,9 +31,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var tvStatus: TextView
     private lateinit var tvLog: TextView
-    private lateinit var btnMic: Button
-    private lateinit var btnSettings: Button
-
     private var tts: TextToSpeech? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private val client = OkHttpClient()
@@ -39,22 +38,67 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try {
-            setContentView(R.layout.activity_main)
-            tvStatus = findViewById(R.id.tvStatus)
-            tvLog = findViewById(R.id.tvLog)
-            btnMic = findViewById(R.id.btnMic)
-            btnSettings = findViewById(R.id.btnSettings)
 
-            checkPermissions()
-            tts = TextToSpeech(this, this)
-            setupSpeechRecognizer()
-
-            btnMic.setOnClickListener { startListening() }
-            btnSettings.setOnClickListener { showSettingsDialog() }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#0D1117"))
+            setPadding(48, 80, 48, 48)
         }
+
+        val tvTitle = TextView(this).apply {
+            text = "АЙЛИН"
+            setTextColor(Color.parseColor("#58A6FF"))
+            textSize = 32f
+            gravity = Gravity.CENTER
+        }
+
+        tvStatus = TextView(this).apply {
+            text = "Готова к работе, Сэр"
+            setTextColor(Color.parseColor("#3FB950"))
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setPadding(0, 16, 0, 24)
+        }
+
+        tvLog = TextView(this).apply {
+            text = "Система запущена. Нажмите кнопку ниже, Сэр..."
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setPadding(24, 24, 24, 24)
+        }
+
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(Color.parseColor("#161B22"))
+            addView(tvLog)
+        }
+
+        val btnMic = Button(this).apply {
+            text = "🎙 ГОВОРИТЬ (АЙЛИН)"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#238636"))
+            textSize = 18f
+            setOnClickListener { startListening() }
+        }
+
+        val btnSettings = Button(this).apply {
+            text = "⚙️ Настройки API и WhatsApp"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#30363D"))
+            textSize = 15f
+            setOnClickListener { showSettingsDialog() }
+        }
+
+        root.addView(tvTitle)
+        root.addView(tvStatus)
+        root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        root.addView(btnMic, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 160).apply { topMargin = 24 })
+        root.addView(btnSettings, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 130).apply { topMargin = 16 })
+
+        setContentView(root)
+
+        checkPermissions()
+        tts = TextToSpeech(this, this)
+        setupSpeechRecognizer()
     }
 
     private fun checkPermissions() {
@@ -75,15 +119,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) {
-                        runOnUiThread {
-                            if (utteranceId == "WAKE_GREETING") startListening()
-                        }
+                        runOnUiThread { if (utteranceId == "WAKE_GREETING") startListening() }
                     }
                     override fun onError(utteranceId: String?) {}
                 })
                 speak("Да, Сэр.", "WAKE_GREETING")
-            } else {
-                tvStatus.text = "Нажмите кнопку и скажите команду"
             }
         } catch (_: Exception) {}
     }
@@ -95,10 +135,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun setupSpeechRecognizer() {
         try {
-            if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-                tvStatus.text = "Микрофон не поддерживается"
-                return
-            }
+            if (!SpeechRecognizer.isRecognitionAvailable(this)) return
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
             speechRecognizer?.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) { tvStatus.text = "🎙 Слушаю Вас, Сэр..." }
@@ -177,29 +214,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val prefs = getSharedPreferences("AylinPrefs", Context.MODE_PRIVATE)
         val apiKey = prefs.getString("GEMINI_KEY", "") ?: ""
         val greenUrl = prefs.getString("GREEN_URL", "") ?: ""
-        if (apiKey.isEmpty()) { speak("Сэр, укажите Gemini API ключ в настройках."); return }
+        if (apiKey.isEmpty()) { speak("Сэр, укажите Gemini API ключ в настройках внизу."); return }
 
         tvStatus.text = "🧠 Айлин думает..."
         scope.launch(Dispatchers.IO) {
             try {
-                val prompt = "Ты Айлин, личный голосовой ассистент. Обращайся к пользователю исключительно 'Сэр'. Отвечай кратко и чётко. Если Сэр просит отправить WhatsApp, верни ТОЛЬКО JSON: {\"action\":\"whatsapp\",\"phone\":\"77001234567\",\"text\":\"текст\"}. Если Сэр спрашивает про трейдинг, XAUUSD, SMC, ICT или FVG, дай краткий точный анализ."
-                val bodyJson = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", "$prompt\n\nЗапрос Сэра: $userText")))))
-                val req = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
-                    .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
-                    .build()
-                val respStr = client.newCall(req).execute().body?.string() ?: ""
-                val reply = JSONObject(respStr).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text").trim()
-
-                withContext(Dispatchers.Main) {
-                    tvStatus.text = "Готова к работе, Сэр"
-                    if (reply.contains("\"action\":\"whatsapp\"")) {
-                        val obj = JSONObject("{${reply.substringAfter("{").substringBeforeLast("}")}}")
-                        sendWhatsApp(greenUrl, obj.getString("phone"), obj.getString("text"))
-                    } else speak(reply)
-                }
-            } catch (_: Exception) {
-        
+                val host = "://googleapis.com"
+                val endpoint = "https://$host/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+val prompt = "Ты Айлин, личный голосовой ассистент. Обращайся к пользователю исключительно 'Сэр'. Отвечай кратко и чётко. Если Сэр просит отправить WhatsApp, верни ТОЛЬКО JSON: {"action":"whatsapp","phone":"77001234567","text":"текст"}. Если Сэр спрашивает про трейдинг, XAUUSD, SMC, ICT или FVG, дай краткий точный анализ."
+val bodyJson = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", "$prompt\n\nЗапрос Сэра: $userText")))))
+val req = Request.Builder().url(endpoint).post(bodyJson.toString().toRequestBody("application/json".toMediaType())).build()
+val respStr = client.newCall(req).execute().body?.string() ?: ""
+val reply = JSONObject(respStr).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text").trim()
+withContext(Dispatchers.Main) {
+tvStatus.text = "Готова к работе, Сэр"
+if (reply.contains(""action":"whatsapp"")) {
+val obj = JSONObject("{${reply.substringAfter("{").substringBeforeLast("}")}}")
+sendWhatsApp(greenUrl, obj.getString("phone"), obj.getString("text"))
+} else speak(reply)
+}
+} catch (_: Exception) {
 withContext(Dispatchers.Main) { tvStatus.text = "Ошибка связи"; speak("Сэр, ошибка соединения с сервером.") }
 }
 }
