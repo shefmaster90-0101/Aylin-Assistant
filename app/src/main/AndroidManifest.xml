@@ -9,12 +9,12 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <queries>
-        <package android:name="com.google.android.youtube" />
-        <package android:name="com.instagram.android" />
-        <package android:name="org.telegram.messenger" />
-        <package android:name="com.whatsapp" />
-        <package android:name="com.android.chrome" />
-        <package android:name="net.metaquotes.metatrader5" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEARCH" />
+        </intent>
     </queries>
 
     <application
@@ -33,4 +33,5 @@
     </application>
 
 </manifest>
+
 
