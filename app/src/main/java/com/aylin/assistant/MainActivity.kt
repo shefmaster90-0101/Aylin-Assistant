@@ -221,14 +221,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             try {
                 val host = "://googleapis.com"
                 val endpoint = "https://$host/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
-val prompt = "Ты Айлин, личный голосовой ассистент. Обращайся к пользователю исключительно 'Сэр'. Отвечай кратко и чётко. Если Сэр просит отправить WhatsApp, верни ТОЛЬКО JSON: {"action":"whatsapp","phone":"77001234567","text":"текст"}. Если Сэр спрашивает про трейдинг, XAUUSD, SMC, ICT или FVG, дай краткий точный анализ."
+val prompt = "Ты Айлин, личный голосовой ассистент. Обращайся к пользователю исключительно Сэр. Отвечай кратко и чётко. Если Сэр просит отправить WhatsApp, верни ТОЛЬКО JSON с полями whatsapp, phone, text. Если Сэр спрашивает про трейдинг, XAUUSD, SMC, ICT или FVG, дай краткий точный анализ."
 val bodyJson = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", "$prompt\n\nЗапрос Сэра: $userText")))))
 val req = Request.Builder().url(endpoint).post(bodyJson.toString().toRequestBody("application/json".toMediaType())).build()
 val respStr = client.newCall(req).execute().body?.string() ?: ""
 val reply = JSONObject(respStr).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text").trim()
 withContext(Dispatchers.Main) {
 tvStatus.text = "Готова к работе, Сэр"
-if (reply.contains(""action":"whatsapp"")) {
+if (reply.contains("whatsapp") && reply.contains("{")) {
 val obj = JSONObject("{${reply.substringAfter("{").substringBeforeLast("}")}}")
 sendWhatsApp(greenUrl, obj.getString("phone"), obj.getString("text"))
 } else speak(reply)
